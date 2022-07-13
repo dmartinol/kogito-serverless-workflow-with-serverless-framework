@@ -1,0 +1,66 @@
+service: newsletter
+
+frameworkVersion: '3'
+
+provider:
+  name: knative
+  # optional Docker Hub credentials you need if you're using local Dockerfiles as function handlers
+  docker:
+    username: ${env:DOCKER_HUB_USERNAME}
+    password: ${env:DOCKER_HUB_PASSWORD}
+
+functions:
+  event-display:
+    handler: gcr.io/knative-releases/knative.dev/eventing-contrib/cmd/event_display@sha256:a214514d6ba674d7393ec8448dd272472b2956207acb3f83152d3071f0ab1911
+    events:
+      - custom:
+          name: new.subscription.2.event-display
+          filter:
+            attributes:
+              type: new.subscription
+      - custom:
+          name: confirm.subscription.2.event-display
+          filter:
+            attributes:
+              type: confirm.subscription
+  subscription-service:
+    handler: Dockerfile.jvm
+    context: ./subscription-service
+  subscription-flow:
+    handler: Dockerfile.jvm
+    context: ./subscription-flow
+    events:
+      - custom:
+          filter:
+            attributes:
+              type: confirm.subscription
+      - sinkBinding: {}
+    # either use a container image URL for your function `handler` as the commented out `handler`
+    # below shows or make sure that you update the application code and corresponding Dockerfile
+    # to process incoming CloudEvents event data when using the event sources listed below
+    # handler: gcr.io/knative-releases/github.com/knative/eventing-contrib/cmd/event_display:latest
+    # events:
+    #   - custom:
+    #       filter:
+    #         attributes:
+    #           type: greeting
+    #   - kafka:
+    #       consumerGroup: KAFKA_CONSUMER_GROUP_NAME
+    #       bootstrapServers:
+    #         - server1
+    #         - server2
+    #       topics:
+    #         - my-topic
+    #   - awsSqs:
+    #       secretName: aws-credentials
+    #       secretKey: credentials
+    #       queue: QUEUE_URL
+    #   - gcpPubSub:
+    #       project: knative-hackathon
+    #       topic: foo
+    #   - cron:
+    #       schedule: '* * * * *'
+    #       data: '{"message": "Hello world from a Cron event source!"}'
+
+plugins:
+  - serverless-knative

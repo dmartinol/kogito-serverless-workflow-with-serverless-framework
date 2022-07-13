@@ -1,0 +1,6 @@
+node_modules
+*/target/*
+.vscode
+.serverless
+package-lock.json
+.DS_Store

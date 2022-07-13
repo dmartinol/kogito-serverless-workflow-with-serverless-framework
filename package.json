@@ -1,0 +1,13 @@
+{
+  "name": "newsletter-subscription",
+  "version": "1.0.0",
+  "description": "Implementing the Kogito Serverless Workflow newsletter-subscription example with Serverless Framework",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "dmartino@redhat.com",
+  "license": "Apache v2",
+  "devDependencies": {
+    "serverless-knative": "https://github.com/dmartinol/serverless-knative.git"
+  }
+}

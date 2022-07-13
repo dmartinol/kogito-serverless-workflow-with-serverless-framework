@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: newsletter-postgres
+  namespace: newsletter-subscription-db
+data:
+  postgrespass: cGFzcwo=
+type: Opaque
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: newsletter-postgres
+  namespace: newsletter-subscription-db
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: newsletter-postgres
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: newsletter-postgres
+  namespace: newsletter-subscription-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: newsletter-postgres
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: 'true'
+      labels:
+        app: newsletter-postgres
+    spec:
+      containers:
+        - env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: postgrespass
+                  name: newsletter-postgres
+          image: quay.io/dmartino/postgres:13.4-alpine3.14
+          imagePullPolicy: Always
+          name: newsletter-postgres
+          ports:
+            - containerPort: 5432
+              name: tcp
+              protocol: TCP
