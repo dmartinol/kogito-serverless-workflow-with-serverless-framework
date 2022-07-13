@@ -1,7 +1,7 @@
 # Objective
 Purpose of this project is to run one of the examples of the Kogito Serverless Workflow available under the 
 [kogito-examples](https://github.com/kiegroup/kogito-examples/tree/stable/serverless-workflow-examples) repository
-using the [Serverless Framework](serverless.com) in the OpenShift environment.
+using the [Serverless Framework](http://serverless.com) in the OpenShift environment.
 
 The selected examples is the [Newsletter Subscription Showcase](https://github.com/kiegroup/kogito-examples/tree/stable/serverless-workflow-examples/serverless-workflow-newsletter-subscription), in the `stable` branch as of July 12, 2022.
 
@@ -14,6 +14,8 @@ The selected examples is the [Newsletter Subscription Showcase](https://github.c
   * The initial project was created with the command: `serverless create --template knative-docker --path newsletter-subscription`
 * OpenShift `4.8+`
   * Red Hat OpenShift Serverless `1.20+`
+* JDK 11+ and Maven 3.8+ to build the Quarkus application
+* Of course, we assume this runs from a `bash` shell
   
 # System Architecture
 As described by the following architectural diagram, the system is made of 4 services:
@@ -25,14 +27,15 @@ As described by the following architectural diagram, the system is made of 4 ser
 ![](./serverless-workflow-newsletter-subscription.jpeg)
 
 The following Knative Eventing resources connect the serverless components:
-1. A `SinkBinding` instance connect the `default` Broker to the `subscription-service`, so it can send events of type `new.subscription`
-1. A `Trigger` instance to forward events of type `confirm.subscription` received from the `default` Broker to the `subscription-flow` Service
-1. A `Trigger` instance to forward events of type `new.subscription` received from the `default` Broker to the `event-display` Service
+1. A `SinkBinding` instance connect the `default` Broker to the `subscription-flow`, so it can send events of type `new.subscription`
+2. A `Trigger` instance to forward events of type `confirm.subscription` from the `default` Broker to the `subscription-flow` Service
+3. A `Trigger` instance to forward events of type `new.subscription` from the `default` Broker to the `event-display` Service
 
 # Design using the Serverless Framework
 The design of an application based on the [Serverless Framework](http://serverless.com) starts from the [serverless.yaml](./serverless.yml) that defines the basic components of the architecture:
-* [Functions](https://www.serverless.com/framework/docs/providers/aws/guide/functions) define the configuration of each serverless function
-* [Events](https://www.serverless.com/framework/docs/providers/aws/guide/events) define the actions that trigger the functions to run
+* [Functions](https://www.serverless.com/framework/docs/providers/aws/guide/functions) define the configuration of each serverless function and are mapped to instances of Knatice Service
+* [Events](https://www.serverless.com/framework/docs/providers/aws/guide/events) define the actions that trigger the functions to run and are mapped to Knative Eventing instances of different type (e.g., the
+  `custom` event type is mapped to a `Knative Trigger` and so on)
 
 Even if the framework is implemented to work with AWS cloud by default, a [Knative provider](https://www.serverless.com/framework/docs/providers/knative) has been developed to deploy the configured applications on the OpenShift platforms where the [Knative](https://knative.dev/docs/)
 technology has been configured to run serverless containers.
@@ -56,13 +59,13 @@ The `serverless-knative` plugin is the entry point of the Knative provider, and 
 The updated source code is available at this [forked git repo](https://github.com/dmartinol/serverless-knative)
 
 ## knative-serving 
-The `knative-serving` is a Node.js component defining the adpatation layer between the `Serverless Framework` and the `Knative Serving` resources. Main updates in the [forked git repo](https://github.com/dmartinol/knative-serving) are:
+The `knative-serving` is a Node.js component defining the adaptation layer between the `Serverless Framework` and the `Knative Serving` resources. Main updates in the [forked git repo](https://github.com/dmartinol/knative-serving) are:
 * Manage version `v1` instead of `v1alpha1`
 * Apply framework changes as the original code was developed from an old version of the `Serverless Components` which is no more compliant sith the latest version of the `Serverless Framework`
 * Manage multi-function services instead of a single function per service in the `serverless info` operation
 
 ## knative-eventing 
-The `knative-eventing` is a Node.js component defining the adpatation layer between the `Serverless Framework` and the `Knative Eventing` resources. Main updates in the [forked git repo](https://github.com/dmartinol/knative-eventing) are:
+The `knative-eventing` is a Node.js component defining the adaptation layer between the `Serverless Framework` and the `Knative Eventing` resources. Main updates in the [forked git repo](https://github.com/dmartinol/knative-eventing) are:
 * Manage version `v1` instead of `v1alpha1`
 * Apply framework changes as the original code was developed from an old version of the `Serverless Components`
 * Automatically create the `Knative Broker` instance using the [eventing.knative.dev/injection](https://knative.dev/docs/eventing/broker/triggers/#trigger-annotations)
@@ -88,7 +91,7 @@ changed using the `--stage` option in the `serverless` commands)
 The code of [subscription-service](./subscription-service/) was copied from the original git repository, no other changes are needed.
 
 The [Dockerfile.jvm](./subscription-service/Dockerfile.jvm) to build this Quarkus based application was taken from 
-[QuickStarts for Getting Started Guides](https://github.com/quarkusio/quarkus-quickstarts/blob/main/getting-started/src/main/docker/Dockerfile.jvm). In addition to that, we've added two `ENV` variables to match the `mewsletter-postgres` deployment:
+[QuickStarts for Getting Started Guides](https://github.com/quarkusio/quarkus-quickstarts/blob/main/getting-started/src/main/docker/Dockerfile.jvm). In addition to that, we've added two `ENV` variables to match the `newsletter-postgres` deployment:
 ```dockerfile
 ENV POSTGRES_PASSWORD=cGFzcwo=
 ENV POSTGRES_HOST=newsletter-postgres.newsletter-subscription-db
@@ -110,7 +113,7 @@ When the service is deployed, the following happens:
 * A Knative Service `newsletter-subscription-service` is created, running Pods with the above image
 
 ### subscription-flow Service
-The `subscription-flow` service is based on a pre-built image of the original example, that is available on [Quay.io](quay.io/dmartino/serverless-workflow-newsletter-subscription-flow:2.0.0-SNAPSHOT), as specified in the associated [Dockerfile.jvm](./subscription-flow/Dockerfile.jvm). The `Dockerfile` also overrides the default image providing some extra `ENV` properties:
+The `subscription-flow` service is based on a pre-built image of the original example, that is available on [Quay.io](http://quay.io/dmartino/serverless-workflow-newsletter-subscription-flow:2.0.0-SNAPSHOT), as specified in the associated [Dockerfile.jvm](./subscription-flow/Dockerfile.jvm). The `Dockerfile` also overrides the default image providing some extra `ENV` properties:
 ```dockerfile
 ENV SUBSCRIPTION_API_URL=http://newsletter-subscription-service.sls-newsletter-dev.svc.cluster.local
 ENV POSTGRES_HOST=newsletter-postgres.newsletter-subscription-db
@@ -132,13 +135,13 @@ functions:
 When the service is deployed, the following happens:
 * A Knative Service `newsletter-subscription-flow` is created, running Pods with the specified image
 * A Knative Broker with the name `default` is created using the default implementation 
-* A Knative Trigger with the standard name `subscription-flow-custom` is created to receive events of type `confirm.subscription`
-* A Knative SinkBinding with the standard name `subscription-flow-sinkBinding` is created to connect the `default` Broker to the
+* A Knative Trigger with the standard name `newsletter-subscription-flow-custom` is created to receive events of type `confirm.subscription`
+* A Knative SinkBinding with the standard name `newsletter-subscription-flow-sinkBinding` is created to connect the `default` Broker to the
  `newsletter-subscription-flow` service
 
 **Note**: before installing the service, we must build the Quarkus application as:
 ```bash
-ca subscription-service
+cd subscription-service
 mvn clean package
 ```
 
@@ -179,6 +182,12 @@ Check the status:
 serverless info
 ```
 
+## Enable HTTP log traces
+Enable the traces from the request module to see the details about the URLs, payloads and the requests:
+```bash
+NODE_DEBUG=request serverless deploy
+```
+
 # Testing the application
 Run the applications using the default browser with:
 ```bash
@@ -193,9 +202,10 @@ oc logs -l serving.knative.dev/service=newsletter-event-display -f -n sls-newsle
 ```
 (Note: the Pod must be running)
 
-## Enable HTTP log traces
-Enable the traces from the request module to see the details about the URLs, payloads and the requests:
+# Unstall the application
+Uninstall the application and the related DB resources:
 ```bash
-NODE_DEBUG=request serverless deploy
+serverless remove
+oc delete -f newsletter-postgres/newsletter-postgres.yaml
+oc delete namespace newsletter-subscription-db
 ```
-
