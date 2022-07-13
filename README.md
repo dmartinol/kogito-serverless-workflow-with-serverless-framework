@@ -24,13 +24,61 @@ As described by the following architectural diagram, the system is made of 4 ser
 1. `event-display` it's another serverless Knative Service whose purpose is to connect to the event broker and print the [Cloud Events](https://cloudevents.io/) it is subscribed for
 1. `newsletter-postgres` is a regular OpensShift Deployment which implements the subscription data store with a PosgreSQL database
 
-![](./serverless-workflow-newsletter-subscription.jpeg)
+```mermaid
+graph TD
+   subscription-flow(<b>serving.knative.dev.Service</b><br/>subscription-flow)
+   sb-subscription-flow(<b>SinkBinding</b><br/>sb-subscription-flow)
+   confirm-subscription-trigger-subscription-flow(<b>Trigger</b><br/>confirm-subscription-trigger-subscription-flow)
+   broker[<b>eventing.knative.dev.Broker</b><br/>default]
+   confirm-subscription-trigger-event-display(<b>Trigger</b><br/>confirm-subscription-trigger-event-display)
+   subscription-service(<b>serving.knative.dev.Service</b><br/>subscription-service)
+   event-display(<b>serving.knative.dev.Service</b><br/>event-display)
+   newsletter-postgres[(<b>v1.Service</b><br/>newsletter-postgres)]
+
+   sb-subscription-flow --subject<br/>env.K_SINK--> subscription-flow
+   sb-subscription-flow --sink--> broker
+   
+   confirm-subscription-trigger-subscription-flow --broker--> broker
+   confirm-subscription-trigger-subscription-flow --subscriber--> event-display
+
+   confirm-subscription-trigger-event-display --broker--> broker
+   confirm-subscription-trigger-event-display --subscriber--> subscription-flow
+
+   subscription-flow --env.SUBSCRIPTION_API_URL-->subscription-service
+   subscription-flow --env.POSTGRES_HOST-->newsletter-postgres
+   subscription-service --env.POSTGRES_HOST-->newsletter-postgres
+```
 
 The following Knative Eventing resources connect the serverless components:
 1. A `SinkBinding` instance connect the `default` Broker to the `subscription-flow`, so it can send events of type `new.subscription`
 2. A `Trigger` instance to forward events of type `confirm.subscription` from the `default` Broker to the `subscription-flow` Service
 3. A `Trigger` instance to forward events of type `new.subscription` from the `default` Broker to the `event-display` Service
 
+```mermaid
+graph TD
+   subgraph subscription-flow 
+      subscription-flow-ui(<b>webapp</b><br/>subscription-flow-ui)
+      subscription-flow-svc(<b>serving.knative.dev.Service</b><br/>subscription-flow)
+   end
+   subscription-service(<b>serving.knative.dev.Service</b><br/>subscription-service)
+   broker[<b>eventing.knative.dev.Broker</b><br/>default]
+   event-display(<b>serving.knative.dev.Service</b><br/>event-display)
+   newsletter-postgres[(<b>v1.Service</b><br/>newsletter-postgres)]
+
+
+   subscription-flow-svc -.process_instance table.-> newsletter-postgres
+   subscription-flow-svc -.HTTP GET verify/.-> subscription-service
+   subscription-flow-svc -.HTTP POST subscribe/.-> subscription-service
+   subscription-flow-svc -.HTTP PUT confirm/.-> subscription-service
+   subscription-flow-svc -.new.subscription.-> broker
+   subscription-flow-ui -.confirm.subscription.-> broker
+
+   subscription-service -.newsletter_sub table.-> newsletter-postgres
+
+   broker -.new.subscription.-> event-display
+   broker -.confirm.subscription.-> subscription-flow
+
+```
 # Design using the Serverless Framework
 The design of an application based on the [Serverless Framework](http://serverless.com) starts from the [serverless.yaml](./serverless.yml) that defines the basic components of the architecture:
 * [Functions](https://www.serverless.com/framework/docs/providers/aws/guide/functions) define the configuration of each serverless function and are mapped to instances of Knatice Service
