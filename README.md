@@ -257,3 +257,19 @@ serverless remove
 oc delete -f newsletter-postgres/newsletter-postgres.yaml
 oc delete namespace newsletter-subscription-db
 ```
+
+# Troubleshooting
+## Integration of RH Service Mesh
+In case the `RH Service Mesh` has been integrated following the official [instructions](https://docs.openshift.com/container-platform/4.10/serverless/admin_guide/serverless-ossm-setup.html),
+you might be unable to open the URLs exposed by the Knative services.
+The following `server` must be added to the configuration of the `knative-ingress-gateway` Gateway in the `knative-serving` namespace, to
+allow the traffic being forwarded to Knative Services that are exposing HTTP port 80:
+```yaml
+  servers:
+    - hosts:
+        - '*'
+      port:
+        name: http
+        number: 80
+        protocol: HTTP
+```
