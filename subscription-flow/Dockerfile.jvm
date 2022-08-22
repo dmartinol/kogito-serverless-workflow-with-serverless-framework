@@ -1,4 +1,4 @@
-FROM quay.io/dmartino/serverless-workflow-newsletter-subscription-flow:2.0.0-SNAPSHOT
+FROM quay.io/dmartino/serverless-workflow-newsletter-subscription-flow:1.25.0.Final
 
 ENV SUBSCRIPTION_API_URL=http://newsletter-subscription-service.sls-newsletter-dev.svc.cluster.local
 ENV POSTGRES_HOST=newsletter-postgres.newsletter-subscription-db
